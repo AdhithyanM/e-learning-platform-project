@@ -5,6 +5,7 @@ import {
   loginUser,
   logoutUser,
 } from "../controllers/user.controller";
+import { isAuthenticated } from "../middleware/auth";
 
 const userRouter = express.Router();
 
@@ -14,6 +15,6 @@ userRouter.post("/activateUser", activateUser);
 
 userRouter.post("/login", loginUser);
 
-userRouter.post("/logout", logoutUser);
+userRouter.get("/logout", isAuthenticated, logoutUser);
 
 export default userRouter;
