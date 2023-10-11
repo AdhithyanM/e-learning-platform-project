@@ -82,12 +82,16 @@ userSchema.methods.comparePassword = async function (
 
 // sign access token
 userSchema.methods.signAccessToken = function () {
-  return jwt.sign({ id: this._id }, process.env.ACCESS_TOKEN_SECRET || "");
+  return jwt.sign({ id: this._id }, process.env.ACCESS_TOKEN_SECRET || "", {
+    expiresIn: "5m",
+  });
 };
 
 // sign refresh token
 userSchema.methods.signRefreshToken = function () {
-  return jwt.sign({ id: this._id }, process.env.REFRESH_TOKEN_SECRET || "");
+  return jwt.sign({ id: this._id }, process.env.REFRESH_TOKEN_SECRET || "", {
+    expiresIn: "3d",
+  });
 };
 
 const userModel: Model<IUser> = mongoose.model("User", userSchema);

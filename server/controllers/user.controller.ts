@@ -3,11 +3,11 @@ import { Request, Response, NextFunction } from "express";
 import userModel, { IUser } from "../models/user.model";
 import ErrorHandler from "../utils/ErrorHandler";
 import CatchAsyncError from "../middleware/catchAsyncErrors";
-import jwt, { Secret } from "jsonwebtoken";
+import jwt, { JwtPayload, Secret } from "jsonwebtoken";
 import ejs from "ejs";
 import path from "path";
 import sendMail from "../utils/sendMail";
-import { sendToken } from "../utils/jwt";
+import { accessTokenOptions, refreshTokenOptions } from "../utils/jwt";
 import { redis } from "../utils/redis";
 
 interface IRegistrationBody {
@@ -153,7 +153,20 @@ export const loginUser = CatchAsyncError(
         return next(new ErrorHandler("Invalid email or password", 400));
       }
 
-      sendToken(user, 200, res);
+      const accessToken = user.signAccessToken();
+      const refreshToken = user.signRefreshToken();
+
+      // upload session to redis
+      redis.set(user._id, JSON.stringify(user) as any);
+
+      res.cookie("access_token", accessToken, accessTokenOptions);
+      res.cookie("refresh_token", refreshToken, refreshTokenOptions);
+
+      res.status(200).json({
+        success: true,
+        user,
+        accessToken,
+      });
     } catch (error: any) {
       return next(new ErrorHandler(error.message, 400));
     }
@@ -173,6 +186,46 @@ export const logoutUser = CatchAsyncError(
       res.status(200).json({
         success: true,
         message: "Logged out successfully",
+      });
+    } catch (error: any) {
+      return next(new ErrorHandler(error.message, 400));
+    }
+  }
+);
+
+export const updateAccessToken = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const refreshToken = req.cookies.refresh_token;
+      if (!refreshToken) {
+        return next(new ErrorHandler("refresh token not provided", 400));
+      }
+
+      const decoded = jwt.verify(
+        refreshToken,
+        process.env.REFRESH_TOKEN_SECRET as Secret
+      ) as JwtPayload;
+
+      if (!decoded) {
+        return next(new ErrorHandler("Invalid refresh token", 400));
+      }
+
+      const session = await redis.get(decoded.id as string);
+      if (!session) {
+        return next(new ErrorHandler("Invalid session", 400));
+      }
+
+      const user = new userModel(JSON.parse(session));
+
+      const accessToken = user.signAccessToken();
+      const newRefreshToken = user.signRefreshToken();
+
+      res.cookie("access_token", accessToken, accessTokenOptions);
+      res.cookie("refresh_token", newRefreshToken, refreshTokenOptions);
+
+      res.status(200).json({
+        success: true,
+        accessToken,
       });
     } catch (error: any) {
       return next(new ErrorHandler(error.message, 400));

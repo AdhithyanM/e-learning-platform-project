@@ -11,48 +11,27 @@ interface ITokenOptions {
   secure?: boolean;
 }
 
-export const sendToken = (user: IUser, statusCode: number, res: Response) => {
-  const accessToken = user.signAccessToken();
-  const refreshToken = user.signRefreshToken();
+const accessTokenExpiration = parseInt(
+  process.env.ACCESS_TOKEN_EXPIRATION || "300",
+  10
+);
+const refreshTokenExpiration = parseInt(
+  process.env.REFRESH_TOKEN_EXPIRATION || "1200",
+  10
+);
 
-  // upload session to redis
-  redis.set(user._id, JSON.stringify(user) as any);
+// options for cookies
 
-  // parse environment variables to integrate with fallback values
-  const accessTokenExpiration = parseInt(
-    process.env.ACCESS_TOKEN_EXPIRATION || "300",
-    10
-  );
-  const refreshTokenExpiration = parseInt(
-    process.env.REFRESH_TOKEN_EXPIRATION || "1200",
-    10
-  );
+export const accessTokenOptions: ITokenOptions = Object.freeze({
+  expires: new Date(Date.now() + accessTokenExpiration * 60 * 1000),
+  maxAge: accessTokenExpiration * 60 * 1000,
+  httpOnly: true,
+  sameSite: "lax",
+});
 
-  // options for cookies
-  const accessTokenOptions: ITokenOptions = {
-    expires: new Date(Date.now() + accessTokenExpiration * 1000),
-    maxAge: accessTokenExpiration * 1000,
-    httpOnly: true,
-    sameSite: "lax",
-  };
-  const refreshTokenOptions: ITokenOptions = {
-    expires: new Date(Date.now() + refreshTokenExpiration * 1000),
-    maxAge: refreshTokenExpiration * 1000,
-    httpOnly: true,
-    sameSite: "lax",
-  };
-
-  // only set secure to true in production
-  if (process.env.NODE_ENV === "production") {
-    accessTokenOptions.secure = true;
-  }
-
-  res.cookie("access_token", accessToken, accessTokenOptions);
-  res.cookie("refresh_token", refreshToken, refreshTokenOptions);
-
-  res.status(statusCode).json({
-    success: true,
-    user,
-    accessToken,
-  });
-};
+export const refreshTokenOptions: ITokenOptions = Object.freeze({
+  expires: new Date(Date.now() + refreshTokenExpiration * 24 * 60 * 60 * 1000),
+  maxAge: refreshTokenExpiration * 24 * 60 * 60 * 1000,
+  httpOnly: true,
+  sameSite: "lax",
+});
